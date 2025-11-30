@@ -1,0 +1,110 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'elastic/**'
+      - 'kibana/**'
+      - '.github/workflows/docker-publish.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., 7.17.12-r5). Leave empty for auto-increment.'
+        required: false
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  BASE_VERSION: "7.17.12"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "Using manual version: ${{ github.event.inputs.version }}"
+          else
+            # Query GHCR for existing tags (use elasticsearch as reference)
+            TAGS=$(curl -s "https://ghcr.io/v2/${{ github.repository_owner }}/elasticsearch/tags/list" 2>/dev/null | jq -r '.tags[]?' 2>/dev/null || echo "")
+            
+            # Find highest revision number for current base version
+            HIGHEST_REV=0
+            for tag in $TAGS; do
+              if [[ $tag =~ ^${{ env.BASE_VERSION }}-r([0-9]+)$ ]]; then
+                REV=${BASH_REMATCH[1]}
+                if [[ $REV -gt $HIGHEST_REV ]]; then
+                  HIGHEST_REV=$REV
+                fi
+              fi
+            done
+            
+            # Increment revision
+            NEXT_REV=$((HIGHEST_REV + 1))
+            NEW_VERSION="${{ env.BASE_VERSION }}-r${NEXT_REV}"
+            
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "Auto-incremented version: ${NEW_VERSION} (previous highest: r${HIGHEST_REV})"
+          fi
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: determine-version
+    strategy:
+      matrix:
+        include:
+          - image: elasticsearch
+            context: ./elastic
+            dockerfile: ./elastic/Dockerfile
+          - image: kibana
+            context: ./kibana
+            dockerfile: ./kibana/Dockerfile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ needs.determine-version.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ needs.determine-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** \`${{ needs.determine-version.outputs.version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
