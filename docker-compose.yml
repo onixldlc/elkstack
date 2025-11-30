@@ -1,6 +1,6 @@
 services:
   elasticsearch:
-    container_name: elasticsearch-main
+    container_name: elasticsearch
     image: ghcr.io/onixldlc/elasticsearch:7.17.12
     ports:
       - "127.0.0.1:9200:9200"
