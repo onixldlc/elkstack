@@ -1,0 +1,33 @@
+services:
+  elasticsearch:
+    container_name: elasticsearch-main
+    image: ghcr.io/onixldlc/elasticsearch:7.17.12
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - ./elastic/data:/var/lib/elasticsearch
+      - ./elastic/logs:/var/log/elasticsearch
+      - ./elastic/config:/tmp/config
+      - share:/tmp/share
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+
+  kibana:
+    container_name: kibana
+    image: ghcr.io/onixldlc/kibana:7.17.12
+    ports:
+      - "127.0.0.1:5601:5601"
+    volumes:
+      - ./kibana/logs:/var/log/kibana
+      - ./kibana/config:/etc/kibana
+      - share:/tmp/share
+    environment:
+      - KIBANA_HOST=${KIBANA_HOST}
+      - KIBANA_PORT=${KIBANA_PORT}
+      - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
+      - ELASTICSEARCH_URLS=${ELASTICSEARCH_URLS}
+    depends_on:
+      - elasticsearch
+
+volumes:
+  share:
