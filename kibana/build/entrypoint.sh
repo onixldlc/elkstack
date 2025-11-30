@@ -1,12 +1,16 @@
 #/bin/bash
 
-# wait until elastic is running
+# wait until all elastic is running
 echo "Waiting for Elasticsearch to be available..."
-until curl --insecure --silent --output /dev/null --write-out "%{http_code}" https://elasticsearch:9200 | grep -qE "200|401|403"; do
-    sleep 20
-    echo "Still waiting..."
+for ELASTIC_URL in $(echo ${ELASTICSEARCH_URLS} | jq -r '.[]'); do
+    echo "Checking ${ELASTIC_URL}..."
+    until curl --insecure --silent --output /dev/null --write-out "%{http_code}" ${ELASTIC_URL} | grep -qE "200|401|403"; do
+        sleep 5
+        echo "Still waiting for ${ELASTIC_URL}..."
+    done
+    echo "Elasticsearch at ${ELASTIC_URL} is running!"
 done
-echo "Elasticsearch is running!"
+echo "All Elasticsearch nodes are available!"
 
 
 PASSWORD=$(cat /tmp/share/credential.txt)
