@@ -2,7 +2,6 @@ services:
   elasticsearch:
     container_name: elasticsearch-main
     build: ./elastic
-    image: ghcr.io/onixldlc/elasticsearch:7.17.12
     ports:
       - "127.0.0.1:9200:9200"
     volumes:
@@ -16,7 +15,6 @@ services:
   kibana:
     container_name: kibana
     build: ./kibana
-    image: ghcr.io/onixldlc/kibana:7.17.12
     ports:
       - "127.0.0.1:5601:5601"
     volumes:
