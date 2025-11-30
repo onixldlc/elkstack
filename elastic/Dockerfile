@@ -4,7 +4,8 @@ RUN apt-get update && apt-get install -y \
     neovim \
     wget \
     curl \
-    vim
+    vim \
+    jq
 
 RUN wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.17.12-amd64.deb
 RUN apt-get install -y -f ./elasticsearch-7.17.12-amd64.deb

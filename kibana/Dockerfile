@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install -y \
     neovim \
     wget \
     curl \
-    vim
+    vim \
+    jq
 
 RUN wget https://artifacts.elastic.co/downloads/kibana/kibana-7.17.12-amd64.deb
 RUN apt-get install -y -f ./kibana-7.17.12-amd64.deb
@@ -20,4 +21,3 @@ RUN chmod +x *.sh
 ENV PATH="/usr/share/kibana/bin:${PATH}"
 ENTRYPOINT ["bash"]
 CMD ["/kibana/entrypoint.sh"]
-# ENTRYPOINT ["tail", "-f", "/dev/null"]
