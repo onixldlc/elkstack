@@ -100,7 +100,7 @@ cp ${CONFIG_PATH}/memory.options ${ELASTIC_ETC}/jvm.options.d/memory.options
 
 
 # add elastic lib data so it can be volumed out
-if [ ! -d ${ELASTIC_LIB} ]; then
+if [ ! -d ${ELASTIC_LIB}/nodes ]; then
     echo "elastic lib data directory does not exist. Creating and copying default data..."
     cp -r /tmp/elasticsearch_data_lib/ ${ELASTIC_LIB}/
     chown -R elasticsearch:elasticsearch ${ELASTIC_LIB}/
