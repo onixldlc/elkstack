@@ -73,6 +73,9 @@ jobs:
           - image: kibana
             context: ./kibana
             dockerfile: ./kibana/Dockerfile
+          - image: logstash
+            context: ./logstash
+            dockerfile: ./logstash/Dockerfile
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
