@@ -29,5 +29,13 @@ services:
     depends_on:
       - elasticsearch
 
+  logstash:
+    container_name: logstash
+    build: ./logstash
+    volumes:
+      - ./logstash/config:/tmp/config
+    environment:
+      - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
+
 volumes:
   share:

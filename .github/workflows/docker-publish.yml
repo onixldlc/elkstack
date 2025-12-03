@@ -6,6 +6,7 @@ on:
     paths:
       - 'elastic/**'
       - 'kibana/**'
+      - 'logstash/**'
       - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
     inputs:

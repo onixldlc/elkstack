@@ -57,6 +57,7 @@ Create a `.env` file based on `env.example`:
 |---------|------|--------|
 | Elasticsearch | 9200 | `https://localhost:9200` |
 | Kibana | 5601 | `https://localhost:5601` |
+| Logstash | - | - |
 
 > **Note:** By default, ports are bound to `127.0.0.1` only for security. Modify the docker-compose file to expose externally if needed.
 
@@ -69,3 +70,4 @@ Create a `.env` file based on `env.example`:
 | Elasticsearch | `/tmp/config` | Configuration files |
 | Kibana | `/var/log/kibana` | Log files |
 | Kibana | `/etc/kibana` | Configuration files |
+| Logstash | `/tmp/config` | Configuration files |
