@@ -36,7 +36,8 @@ jobs:
             echo "Using manual version: ${{ github.event.inputs.version }}"
           else
             # Query GHCR for existing tags (use elasticsearch as reference)
-            TAGS=$(curl -s "https://ghcr.io/v2/${{ github.repository_owner }}/elasticsearch/tags/list" 2>/dev/null | jq -r '.tags[]?' 2>/dev/null || echo "")
+            TAGS=$(curl -s -H "Authorization: Bearer ${{ secrets. GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/elasticsearch/tags/list" | jq -r '.tags[]?' || echo "")
             
             # Find highest revision number for current base version
             HIGHEST_REV=0
