@@ -1,7 +1,7 @@
 #/bin/bash
 
 
-until curl --insecure --silent --output /dev/null --write-out "%{http_code}" ${KIBANA_BASEURL} | grep -qE "200|401|403"; do
+until curl --insecure --silent --output /dev/null --write-out "%{http_code}" ${KIBANA_BASEURL}/login | grep -qE "200|401|403"; do
     sleep 20
     echo "Still waiting for ${KIBANA_BASEURL}..."
 done
