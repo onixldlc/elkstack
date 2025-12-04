@@ -43,6 +43,8 @@ chmod 770 ${CONFIG_PATH}/elasticsearchca.pem
 chmod 770 ${CONFIG_PATH}/server-kibana.*
 cp ${CONFIG_PATH}/elasticsearchca.pem ${KIBANA_ETC}/
 cp ${CONFIG_PATH}/server-kibana.* ${KIBANA_ETC}/
+cp ${CONFIG_PATH}/elasticsearchca.pem ${SHARE_PATH}/
+cp ${CONFIG_PATH}/server-kibana.* ${SHARE_PATH}/
 chown kibana:kibana ${KIBANA_LOG}/
 chown kibana:kibana ${KIBANA_ETC}/elasticsearchca.pem
 chown kibana:kibana ${KIBANA_ETC}/server-kibana.*
