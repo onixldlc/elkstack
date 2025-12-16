@@ -53,7 +53,8 @@ if [ ! -f ${CONFIG_PATH}/kibana.keystore ]; then
     echo "Kibana keystore does not exist. Creating..."
     kibana-keystore create
     echo "${PASSWORD}" | kibana-keystore add elasticsearch.password -x
-    cp ${KIBANA_LIB}/kibana.keystore ${CONFIG_PATH}/kibana.keystore
+    cp ${KIBANA_ETC}/kibana.keystore ${CONFIG_PATH}/kibana.keystore
+    cp ${CONFIG_PATH}/kibana.keystore ${KIBANA_LIB}/kibana.keystore
 else
     echo "Kibana keystore already exists. using existing file..."
     cp ${CONFIG_PATH}/kibana.keystore ${KIBANA_LIB}/kibana.keystore
