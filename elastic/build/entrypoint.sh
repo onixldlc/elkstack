@@ -110,4 +110,34 @@ fi
 
 
 echo ${PASSWORD} > /tmp/share/credential.txt
-su elasticsearch -s "/usr/share/elasticsearch/bin/elasticsearch"
+
+su elasticsearch -s "/usr/share/elasticsearch/bin/elasticsearch" &
+ES_PID=$!
+
+until curl --insecure --silent --output /dev/null --write-out "%{http_code}" \
+    https://localhost:9200 -u "elastic:${PASSWORD}" | grep -q "200"; do
+    sleep 5
+    echo "Waiting for Elasticsearch API..."
+done
+
+if [ ! -f ${CONFIG_PATH}/.monitor_user_created ]; then
+    MONITOR_PASSWORD=$(< /dev/urandom tr -dc 'A-Za-z0-9' | head -c 20)
+
+    curl --insecure --silent -u "elastic:${PASSWORD}" \
+        -X PUT "https://localhost:9200/_security/role/logstash_disk_monitor" \
+        -H "Content-Type: application/json" \
+        -d '{"cluster":["monitor"],"indices":[],"applications":[]}'
+
+    curl --insecure --silent -u "elastic:${PASSWORD}" \
+        -X PUT "https://localhost:9200/_security/user/logstash_monitor" \
+        -H "Content-Type: application/json" \
+        -d "{\"password\":\"${MONITOR_PASSWORD}\",\"roles\":[\"logstash_disk_monitor\"],\"full_name\":\"Logstash Disk Monitor\"}"
+
+    echo "${MONITOR_PASSWORD}" > /tmp/pub-share/logstash_monitor_cred.txt
+    touch ${CONFIG_PATH}/.monitor_user_created
+    echo "Logstash monitor user created."
+else
+    echo "Logstash monitor user already exists. Skipping..."
+fi
+
+wait ${ES_PID}

@@ -9,6 +9,7 @@ services:
       - ./elastic/logs:/var/log/elasticsearch
       - ./elastic/config:/tmp/config
       - share:/tmp/share
+      - pub-share:/tmp/pub-share
     environment:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
 
@@ -34,8 +35,11 @@ services:
     build: ./logstash
     volumes:
       - ./logstash/config:/tmp/config
+      - pub-share:/tmp/pub-share
     environment:
       - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
+      - ELASTICSEARCH_URLS=${ELASTICSEARCH_URLS}
 
 volumes:
   share:
+  pub-share:

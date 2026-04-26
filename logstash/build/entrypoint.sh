@@ -35,6 +35,32 @@ else
     echo "${LOGSTASH_ETC}/conf.d/logstash.conf already exists!"
 fi
 
+MONITOR_CRED_FILE="/tmp/pub-share/logstash_monitor_cred.txt"
+
+until [ -f "${MONITOR_CRED_FILE}" ]; do
+    echo "Waiting for Elasticsearch monitor credentials..."
+    sleep 10
+done
+
+MONITOR_PASSWORD=$(cat "${MONITOR_CRED_FILE}")
+ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS:-[\"https://elasticsearch:9200\"]}" | jq -r '.[0]')
+
+echo "Checking Elasticsearch disk usage..."
+DISK_PCT=$(curl --insecure --silent \
+    -u "logstash_monitor:${MONITOR_PASSWORD}" \
+    "${ELASTIC_URL}/_cat/allocation?h=disk.percent" 2>/dev/null \
+    | grep -E '^[0-9]+' | sort -rn | head -1 | tr -d ' ')
+
+if [ -z "$DISK_PCT" ]; then
+    echo "ERROR: Could not retrieve disk usage from Elasticsearch. Aborting."
+    exit 1
+elif [ "$DISK_PCT" -ge 90 ]; then
+    echo "ERROR: Elasticsearch disk at ${DISK_PCT}%. Refusing to start — protect data integrity."
+    exit 1
+else
+    echo "Elasticsearch disk usage: ${DISK_PCT}%. Proceeding."
+fi
+
 echo "Starting Logstash..."
 su logstash -s /bin/bash -c "\
     /usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/logstash.conf 
