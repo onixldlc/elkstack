@@ -1,0 +1,67 @@
+services:
+  disk-filler:
+    container_name: disk-filler-test
+    image: ubuntu:24.04
+    volumes:
+      - elastic-data:/data:z
+    command: >
+      sh -c "
+        fallocate -l 1850M /data/filler.bin 2>/dev/null ||
+        dd if=/dev/zero of=/data/filler.bin bs=1M count=1850;
+        echo 'Filled elastic-data volume to ~92%';
+        df -h /data
+      "
+
+  elasticsearch:
+    container_name: elasticsearch-test-disk-limit
+    build: ../elastic
+    volumes:
+      - elastic-data:/var/lib/elasticsearch:z
+      - ./data/disk-limit/elastic/logs:/var/log/elasticsearch:z
+      - ./data/disk-limit/elastic/config:/tmp/config:z
+      - share-disk-limit:/tmp/share
+      - pub-share-disk-limit:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=TestPassword123
+    depends_on:
+      - disk-filler
+
+  kibana:
+    container_name: kibana-test-disk-limit
+    build: ../kibana
+    ports:
+      - "127.0.0.1:5602:5601"
+    volumes:
+      - ./data/disk-limit/kibana/logs:/var/log/kibana:z
+      - ./data/disk-limit/kibana/config:/tmp/config:z
+      - share-disk-limit:/tmp/share
+    environment:
+      - KIBANA_HOST=0.0.0.0
+      - KIBANA_PORT=5601
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'ELASTICSEARCH_URLS=["https://elasticsearch:9200"]'
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    container_name: logstash-test-disk-limit
+    build: ../logstash
+    volumes:
+      - ./data/disk-limit/logstash/config:/tmp/config:z
+      - pub-share-disk-limit:/tmp/pub-share
+    environment:
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'ELASTICSEARCH_URLS=["https://elasticsearch:9200"]'
+    depends_on:
+      - elasticsearch
+      - kibana
+
+volumes:
+  elastic-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=2g,mode=1777
+  share-disk-limit:
+  pub-share-disk-limit:
