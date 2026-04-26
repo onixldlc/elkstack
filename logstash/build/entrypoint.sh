@@ -52,11 +52,22 @@ DISK_PCT=$(curl --insecure --silent \
     | grep -E '^[0-9]+' | sort -rn | head -1 | tr -d ' ')
 
 if [ -z "$DISK_PCT" ]; then
-    echo "ERROR: Could not retrieve disk usage from Elasticsearch. Aborting."
-    exit 1
+    if [ "${IGNORE_DISK_CHECK:-false}" = "true" ]; then
+        echo "WARNING: Could not retrieve disk usage. IGNORE_DISK_CHECK=true — proceeding anyway."
+    else
+        echo "ERROR: Could not retrieve disk usage from Elasticsearch. Aborting."
+        echo "       Set IGNORE_DISK_CHECK=true to bypass this check (not recommended)."
+        exit 1
+    fi
 elif [ "$DISK_PCT" -ge 90 ]; then
-    echo "ERROR: Elasticsearch disk at ${DISK_PCT}%. Refusing to start — protect data integrity."
-    exit 1
+    if [ "${IGNORE_DISK_CHECK:-false}" = "true" ]; then
+        echo "WARNING: Elasticsearch disk at ${DISK_PCT}%. IGNORE_DISK_CHECK=true — proceeding anyway."
+        echo "         This risks Elasticsearch data corruption. Resolve disk pressure ASAP."
+    else
+        echo "ERROR: Elasticsearch disk at ${DISK_PCT}%. Refusing to start — protect data integrity."
+        echo "       Free up disk space or set IGNORE_DISK_CHECK=true to bypass (not recommended)."
+        exit 1
+    fi
 else
     echo "Elasticsearch disk usage: ${DISK_PCT}%. Proceeding."
 fi
