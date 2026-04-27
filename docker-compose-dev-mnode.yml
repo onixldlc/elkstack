@@ -1,0 +1,67 @@
+services:
+  elasticsearch-node1:
+    container_name: elasticsearch-node1
+    build: ./elastic
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - ./elastic/node1/data:/var/lib/elasticsearch
+      - ./elastic/node1/logs:/var/log/elasticsearch
+      - ./elastic/shared/config:/tmp/config
+      - share:/tmp/share
+      - pub-share:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - NODE_NAME=node1
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+
+  elasticsearch-node2:
+    container_name: elasticsearch-node2
+    build: ./elastic
+    volumes:
+      - ./elastic/node2/data:/var/lib/elasticsearch
+      - ./elastic/node2/logs:/var/log/elasticsearch
+      - ./elastic/shared/config:/tmp/config
+      - share:/tmp/share
+      - pub-share:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - NODE_NAME=node2
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+
+  kibana:
+    container_name: kibana
+    build: ./kibana
+    ports:
+      - "127.0.0.1:5601:5601"
+    volumes:
+      - ./kibana/logs:/var/log/kibana
+      - ./kibana/config:/etc/kibana
+      - share:/tmp/share
+    environment:
+      - KIBANA_HOST=${KIBANA_HOST}
+      - KIBANA_PORT=${KIBANA_PORT}
+      - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+
+  logstash:
+    container_name: logstash
+    build: ./logstash
+    volumes:
+      - ./logstash/config:/tmp/config
+      - pub-share:/tmp/pub-share
+    environment:
+      - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+
+volumes:
+  share:
+  pub-share:

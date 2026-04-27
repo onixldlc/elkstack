@@ -1,0 +1,68 @@
+services:
+  elasticsearch-node1:
+    container_name: elasticsearch-test-multi-normal-node1
+    build: ../elastic
+    volumes:
+      - elastic-multi-normal-node1-data:/var/lib/elasticsearch:z
+      - ./data/multi-node-normal/elastic-shared/config:/tmp/config:z
+      - ./data/multi-node-normal/elastic-node1/logs:/var/log/elasticsearch:z
+      - share-multi-normal:/tmp/share
+      - pub-share-multi-normal:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=TestPassword123
+      - NODE_NAME=node1
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+
+  elasticsearch-node2:
+    container_name: elasticsearch-test-multi-normal-node2
+    build: ../elastic
+    volumes:
+      - elastic-multi-normal-node2-data:/var/lib/elasticsearch:z
+      - ./data/multi-node-normal/elastic-shared/config:/tmp/config:z
+      - ./data/multi-node-normal/elastic-node2/logs:/var/log/elasticsearch:z
+      - share-multi-normal:/tmp/share
+      - pub-share-multi-normal:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=TestPassword123
+      - NODE_NAME=node2
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+
+  kibana:
+    container_name: kibana-test-multi-normal
+    build: ../kibana
+    ports:
+      - "127.0.0.1:5604:5601"
+    volumes:
+      - ./data/multi-node-normal/kibana/logs:/var/log/kibana:z
+      - ./data/multi-node-normal/kibana/config:/tmp/config:z
+      - share-multi-normal:/tmp/share
+    environment:
+      - KIBANA_HOST=0.0.0.0
+      - KIBANA_PORT=5601
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+
+  logstash:
+    container_name: logstash-test-multi-normal
+    build: ../logstash
+    volumes:
+      - ./data/multi-node-normal/logstash/config:/tmp/config:z
+      - pub-share-multi-normal:/tmp/pub-share
+    environment:
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+      - kibana
+
+volumes:
+  elastic-multi-normal-node1-data:
+  elastic-multi-normal-node2-data:
+  share-multi-normal:
+  pub-share-multi-normal:

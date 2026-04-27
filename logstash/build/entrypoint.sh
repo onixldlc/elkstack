@@ -1,5 +1,14 @@
-#/bin/bash
+#!/bin/bash
 
+# Derive ELASTICSEARCH_URLS from DISCOVERY_SEED_HOSTS if not explicitly set
+if [ -z "${ELASTICSEARCH_URLS:-}" ]; then
+    if [ -n "${DISCOVERY_SEED_HOSTS:-}" ]; then
+        ELASTICSEARCH_URLS=$(echo "${DISCOVERY_SEED_HOSTS}" | jq -c '[.[] | "https://" + . + ":9200"]')
+        echo "Auto-derived ELASTICSEARCH_URLS from DISCOVERY_SEED_HOSTS: ${ELASTICSEARCH_URLS}"
+    else
+        ELASTICSEARCH_URLS='["https://elasticsearch:9200"]'
+    fi
+fi
 
 until curl --insecure --silent --output /dev/null --write-out "%{http_code}" ${KIBANA_BASEURL}/login | grep -qE "200|401|403"; do
     sleep 20
@@ -43,7 +52,7 @@ until [ -f "${MONITOR_CRED_FILE}" ]; do
 done
 
 MONITOR_PASSWORD=$(cat "${MONITOR_CRED_FILE}")
-ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS:-[\"https://elasticsearch:9200\"]}" | jq -r '.[0]')
+ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS}" | jq -r '.[0]')
 
 echo "Checking Elasticsearch disk usage..."
 DISK_PCT=$(curl --insecure --silent \
@@ -74,8 +83,9 @@ fi
 
 echo "Starting Logstash..."
 su logstash -s /bin/bash -c "\
-    /usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/logstash.conf 
+    /usr/share/logstash/bin/logstash \
+    -f /etc/logstash/conf.d/logstash.conf \
     --path.data /var/lib/logstash \
     --path.logs /var/log/logstash \
     --log.level info \
-    --http.host"
+    --api.http.host 0.0.0.0"

@@ -1,4 +1,14 @@
-#/bin/bash
+#!/bin/bash
+
+# Derive ELASTICSEARCH_URLS from DISCOVERY_SEED_HOSTS if not explicitly set
+if [ -z "${ELASTICSEARCH_URLS:-}" ]; then
+    if [ -n "${DISCOVERY_SEED_HOSTS:-}" ]; then
+        ELASTICSEARCH_URLS=$(echo "${DISCOVERY_SEED_HOSTS}" | jq -c '[.[] | "https://" + . + ":9200"]')
+        echo "Auto-derived ELASTICSEARCH_URLS from DISCOVERY_SEED_HOSTS: ${ELASTICSEARCH_URLS}"
+    else
+        ELASTICSEARCH_URLS='["https://elasticsearch:9200"]'
+    fi
+fi
 
 # wait until all elastic is running
 echo "Waiting for Elasticsearch to be available..."
@@ -127,7 +137,7 @@ chown -R kibana:kibana ${KIBANA_LOG}
 
 su kibana -s /bin/bash -c "/usr/share/kibana/bin/kibana \
     --logging.dest=/var/log/kibana/kibana.log \
-    --deprecation.skip_deprecated_settings[0]=logging.dest
-    " 2>&1 | tee -a ${KIBANA_LOG}/startup.log
+    --deprecation.skip_deprecated_settings[0]=logging.dest" \
+    2>&1 | tee -a ${KIBANA_LOG}/startup.log
 
 bash

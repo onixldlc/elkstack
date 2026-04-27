@@ -1,0 +1,92 @@
+services:
+  disk-filler:
+    container_name: disk-filler-multi
+    image: ubuntu:24.04
+    volumes:
+      - elastic-node2-data:/data:z
+    command: >
+      sh -c "
+        fallocate -l 1850M /data/filler.bin 2>/dev/null ||
+        dd if=/dev/zero of=/data/filler.bin bs=1M count=1850;
+        echo 'Filled node2 data volume to ~92%';
+        df -h /data
+      "
+
+  elasticsearch-node1:
+    container_name: elasticsearch-test-node1
+    build: ../elastic
+    volumes:
+      - elastic-node1-data:/var/lib/elasticsearch:z
+      - ./data/multi-node/elastic-shared/config:/tmp/config:z
+      - ./data/multi-node/elastic-node1/logs:/var/log/elasticsearch:z
+      - share-multi:/tmp/share
+      - pub-share-multi:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=TestPassword123
+      - NODE_NAME=node1
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+    depends_on:
+      - disk-filler
+
+  elasticsearch-node2:
+    container_name: elasticsearch-test-node2
+    build: ../elastic
+    volumes:
+      - elastic-node2-data:/var/lib/elasticsearch:z
+      - ./data/multi-node/elastic-shared/config:/tmp/config:z
+      - ./data/multi-node/elastic-node2/logs:/var/log/elasticsearch:z
+      - share-multi:/tmp/share
+      - pub-share-multi:/tmp/pub-share
+    environment:
+      - ELASTIC_PASSWORD=TestPassword123
+      - NODE_NAME=node2
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2"]'
+    depends_on:
+      - disk-filler
+
+  kibana:
+    container_name: kibana-test-multi
+    build: ../kibana
+    ports:
+      - "127.0.0.1:5603:5601"
+    volumes:
+      - ./data/multi-node/kibana/logs:/var/log/kibana:z
+      - ./data/multi-node/kibana/config:/tmp/config:z
+      - share-multi:/tmp/share
+    environment:
+      - KIBANA_HOST=0.0.0.0
+      - KIBANA_PORT=5601
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+
+  logstash:
+    container_name: logstash-test-multi
+    build: ../logstash
+    volumes:
+      - ./data/multi-node/logstash/config:/tmp/config:z
+      - pub-share-multi:/tmp/pub-share
+    environment:
+      - KIBANA_BASEURL=https://kibana:5601
+      - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      # Uncomment to bypass disk check (not recommended — risks data corruption):
+      #- IGNORE_DISK_CHECK=true
+    depends_on:
+      - elasticsearch-node1
+      - elasticsearch-node2
+      - kibana
+
+volumes:
+  elastic-node1-data:
+  elastic-node2-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=2g,mode=1777
+  share-multi:
+  pub-share-multi:

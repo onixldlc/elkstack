@@ -50,6 +50,9 @@ Create a `.env` file based on `env.example`:
 | `KIBANA_HOST` | Hostname for Kibana server | `kibana` |
 | `KIBANA_PORT` | Port for Kibana server | `5601` |
 | `ELASTICSEARCH_URLS` | Elasticsearch URLs for Kibana/Logstash to connect | `["https://elasticsearch:9200"]` |
+| `DISCOVERY_SEED_HOSTS` | JSON array of node hostnames for cluster discovery (multi-node only). When set on Kibana/Logstash, `ELASTICSEARCH_URLS` is auto-derived as `https://<host>:9200` per entry | *(unset → single-node)* |
+| `CLUSTER_INITIAL_MASTER_NODES` | JSON array of node names eligible to bootstrap the cluster on first start (multi-node only) | *(unset)* |
+| `NODE_NAME` | Per-node identifier used as `node.name` in the cluster (multi-node only) | `elasticsearch` |
 | `IGNORE_DISK_CHECK` | Set to `true` to let Logstash start even when disk ≥ 90% (**not recommended**) | `false` |
 
 ### Ports
@@ -132,24 +135,83 @@ WARNING: Elasticsearch disk at 93%. IGNORE_DISK_CHECK=true — proceeding anyway
 
 Never mount `share` into Logstash. A compromised Logstash container must not be able to reach the superuser password.
 
-## Testing
+## Multi-Node Cluster Deployment
 
-Two test scenarios live under `test/`:
+The stack supports running Elasticsearch as a 2+ node cluster. Two compose files are provided:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose-mnode.yml` | Multi-node, pulls pre-built images from `ghcr.io/onixldlc/*` |
+| `docker-compose-dev-mnode.yml` | Multi-node, builds locally from `./elastic`, `./kibana`, `./logstash` |
+
+### Quick start
 
 ```bash
-# Test 1 — all services start, Logstash proceeds normally
-./test/run-normal.sh
-
-# Test 2 — disk at ~92%, Logstash should detect it and refuse to start
-./test/run-disk-limit.sh
+cp env.example .env
+docker compose -f docker-compose-mnode.yml up -d
 ```
 
-Test 2 uses a Podman tmpfs named volume (2 GB, pre-filled to ~92%) — no host disk is touched.
+This launches two ES nodes (`elasticsearch-node1`, `elasticsearch-node2`) plus Kibana and Logstash, all wired to the cluster via `DISCOVERY_SEED_HOSTS`. Kibana and Logstash auto-derive their `ELASTICSEARCH_URLS` from the seed hosts — no extra config needed.
+
+### How cluster mode is activated
+
+Setting `DISCOVERY_SEED_HOSTS` on the Elasticsearch service (and `CLUSTER_INITIAL_MASTER_NODES` for first-start bootstrap) flips the entrypoint out of single-node mode:
+
+- `discovery.type: single-node` is removed from `elasticsearch.yml`
+- `discovery.seed_hosts` and `cluster.initial_master_nodes` are written from env vars
+- The shared `/tmp/config` volume across nodes ensures one TLS cert and one `elastic` superuser password are generated, then reused by every node
+
+The entrypoint uses an atomic `mkdir`-based leader lock so only one node performs first-time init (cert/keystore/yml generation). Followers wait for `.init_complete` before proceeding. The `logstash_monitor` user is created exclusively by the elected cluster master after ES forms.
+
+### Adding more nodes
+
+Copy a node block and bump the name:
+
+```yaml
+elasticsearch-node3:
+  container_name: elasticsearch-node3
+  image: ghcr.io/onixldlc/elasticsearch:latest
+  volumes:
+    - ./elastic/node3/data:/var/lib/elasticsearch
+    - ./elastic/node3/logs:/var/log/elasticsearch
+    - ./elastic/shared/config:/tmp/config
+    - share:/tmp/share
+    - pub-share:/tmp/pub-share
+  environment:
+    - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    - NODE_NAME=node3
+    - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2","elasticsearch-node3"]'
+    - 'CLUSTER_INITIAL_MASTER_NODES=["node1","node2","node3"]'
+```
+
+Then update `DISCOVERY_SEED_HOSTS` (and `CLUSTER_INITIAL_MASTER_NODES`) on every other service to include the new node.
+
+## Testing
+
+Four test scenarios live under `test/`:
+
+```bash
+# Test 1 — single-node, all services healthy, Logstash proceeds
+./test/run-normal.sh
+
+# Test 2 — single-node, disk at ~92%, Logstash should refuse to start
+./test/run-disk-limit.sh
+
+# Test 3 — 2-node cluster, both nodes healthy, Logstash proceeds
+./test/run-multi-node-normal.sh
+
+# Test 4 — 2-node cluster, node2 at ~92%, Logstash should refuse to start
+./test/run-multi-node.sh
+```
+
+Tests 2 and 4 use a Podman tmpfs named volume (2 GB, pre-filled to ~92%) — no host disk is touched.
 
 Test data goes to `test/data/` (gitignored). To clean up after tests:
 
 ```bash
 podman compose -f test/docker-compose-normal.yml --project-name elkstack-test-normal down --volumes
 podman compose -f test/docker-compose-disk-limit.yml --project-name elkstack-test-disk-limit down --volumes
+podman compose -f test/docker-compose-multi-node-normal.yml --project-name elkstack-test-multi-normal down --volumes
+podman compose -f test/docker-compose-multi-node.yml --project-name elkstack-test-multi down --volumes
 podman unshare rm -rf test/data/   # ES files are owned by container subuid — needs unshare to delete
 ```
