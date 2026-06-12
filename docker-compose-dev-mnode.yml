@@ -45,6 +45,8 @@ services:
       - KIBANA_PORT=${KIBANA_PORT}
       - KIBANA_BASEURL=https://${KIBANA_HOST}:${KIBANA_PORT}
       - 'DISCOVERY_SEED_HOSTS=["elasticsearch-node1","elasticsearch-node2"]'
+      # Recovery-UI: used only when kibana exits and main.js takes over the port.
+      - RETENTION_MONTHS=${RETENTION_MONTHS:-3}
     depends_on:
       - elasticsearch-node1
       - elasticsearch-node2

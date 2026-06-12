@@ -140,4 +140,24 @@ su kibana -s /bin/bash -c "/usr/share/kibana/bin/kibana \
     --deprecation.skip_deprecated_settings[0]=logging.dest" \
     2>&1 | tee -a ${KIBANA_LOG}/startup.log
 
+# Kibana exited — fall back to recovery-ui on the same port + kibana's cert
+# so the browser sees the recovery console "popup" instead of a dead port.
+RECOVERY_UI_DIR="${KIBANA_BUILD}/recovery-ui"
+RECOVERY_PORT="${KIBANA_PORT:-5601}"
+NODE_BIN="$(command -v node || echo /usr/share/kibana/node/bin/node)"
+if [ -d "${RECOVERY_UI_DIR}/dist" ] && [ -x "${NODE_BIN}" ]; then
+    echo "Kibana exited. Starting recovery-ui on port ${RECOVERY_PORT}..."
+    cd "${RECOVERY_UI_DIR}"
+    export PORT="${RECOVERY_PORT}"
+    export SSL_CERT="${KIBANA_ETC}/server-kibana.crt"
+    export SSL_KEY="${KIBANA_ETC}/server-kibana.key"
+    # ES creds for /api/nodes — main.js reads ES_PASSWORD_FILE if ES_PASSWORD unset
+    export ELASTICSEARCH_URLS
+    export ES_USER="${ES_USER:-elastic}"
+    export ES_PASSWORD_FILE="${ES_PASSWORD_FILE:-${SHARE_PATH}/credential.txt}"
+    exec "${NODE_BIN}" main.js
+else
+    echo "recovery-ui dist/ or node missing; no fallback."
+fi
+
 bash
