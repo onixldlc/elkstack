@@ -15,10 +15,14 @@ RUN --mount=type=cache,target=/tmp/downloads \
     apt-get install -y -f /tmp/downloads/kibana-7.17.12-amd64.deb && \
     rm -rf /var/lib/apt/lists/*
 
-COPY build/* /kibana/
+COPY build/ /kibana/
 WORKDIR /kibana
 
-RUN chmod +x *.sh
+RUN chmod +x *.sh recovery-ui/*.sh
+
+# Build recovery-ui at image build time (vendors React/Babel into dist/).
+# Always invalidated when recovery-ui/ changes, so UI updates ship via image rebuild.
+RUN cd /kibana/recovery-ui && ./build.sh
 
 ENV PATH="/usr/share/kibana/bin:${PATH}"
 ENTRYPOINT ["bash"]
