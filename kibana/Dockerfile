@@ -22,7 +22,7 @@ RUN chmod +x *.sh recovery-ui/*.sh
 
 # Build recovery-ui at image build time (vendors React/Babel into dist/).
 # Always invalidated when recovery-ui/ changes, so UI updates ship via image rebuild.
-RUN cd /kibana/recovery-ui && ./build.sh
+# RUN cd /kibana/recovery-ui && ./build.sh
 
 ENV PATH="/usr/share/kibana/bin:${PATH}"
 ENTRYPOINT ["bash"]
