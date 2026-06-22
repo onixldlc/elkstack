@@ -52,7 +52,7 @@ until [ -f "${MONITOR_CRED_FILE}" ]; do
 done
 
 MONITOR_PASSWORD=$(cat "${MONITOR_CRED_FILE}")
-LOGSTASH_DISK_LIMIT=85
+LOGSTASH_DISK_LIMIT=91
 
 echo "Checking Elasticsearch disk usage..."
 ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS}" | jq -r '.[0]')
