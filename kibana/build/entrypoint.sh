@@ -135,23 +135,47 @@ mkdir -p ${KIBANA_LOG}
 chown -R kibana:kibana ${KIBANA_LOG}
 
 
-su kibana -s /bin/bash -c "/usr/share/kibana/bin/kibana \
-    --logging.dest=/var/log/kibana/kibana.log \
-    --deprecation.skip_deprecated_settings[0]=logging.dest" \
-    2>&1 | tee -a ${KIBANA_LOG}/startup.log
+SKIP_KIBANA=false
 
-# Kibana exited — fall back to recovery-ui on the same port + kibana's cert
-# so the browser sees the recovery console "popup" instead of a dead port.
+echo "Checking Elasticsearch disk pressure..."
+export ES_AUTH_PASS="${PASSWORD}"
+read DISK_PCT WATERMARK_PCT <<< "$(/kibana/get-disk-usage.sh)"
+
+if [ -z "${WATERMARK_PCT}" ]; then
+    echo "WARNING: Could not fetch watermark settings from ES. Skipping disk check."
+elif [ -z "${DISK_PCT}" ]; then
+    echo "WARNING: Could not retrieve disk usage from ES. Proceeding with Kibana startup."
+elif [ "${DISK_PCT}" -ge "${WATERMARK_PCT}" ]; then
+    if [ "${IGNORE_DISK_CHECK:-false}" = "true" ]; then
+        echo "WARNING: ES disk at ${DISK_PCT}% >= flood_stage ${WATERMARK_PCT}%. IGNORE_DISK_CHECK=true — starting Kibana anyway."
+    else
+        echo "ERROR: ES disk at ${DISK_PCT}% exceeds flood_stage watermark (${WATERMARK_PCT}%). Skipping Kibana."
+        SKIP_KIBANA=true
+    fi
+else
+    echo "ES disk usage: ${DISK_PCT}% (flood_stage: ${WATERMARK_PCT}%). OK."
+fi
+
+if [ "${SKIP_KIBANA}" = "false" ]; then
+    su kibana -s /bin/bash -c "/usr/share/kibana/bin/kibana \
+        --logging.dest=/var/log/kibana/kibana.log \
+        --deprecation.skip_deprecated_settings[0]=logging.dest" \
+        2>&1 | tee -a ${KIBANA_LOG}/startup.log
+fi
+
 RECOVERY_UI_DIR="${KIBANA_BUILD}/recovery-ui"
 RECOVERY_PORT="${KIBANA_PORT:-5601}"
 NODE_BIN="$(command -v node || echo /usr/share/kibana/node/bin/node)"
 if [ -x "${NODE_BIN}" ]; then
-    echo "Kibana exited. Starting recovery-ui on port ${RECOVERY_PORT}..."
+    if [ "${SKIP_KIBANA}" = "true" ]; then
+        echo "Disk pressure detected. Starting recovery-ui on port ${RECOVERY_PORT}..."
+    else
+        echo "Kibana exited. Starting recovery-ui on port ${RECOVERY_PORT}..."
+    fi
     cd "${RECOVERY_UI_DIR}"
     export PORT="${RECOVERY_PORT}"
     export SSL_CERT="${KIBANA_ETC}/server-kibana.crt"
     export SSL_KEY="${KIBANA_ETC}/server-kibana.key"
-    # ES creds for /api/nodes — main.js reads ES_PASSWORD_FILE if ES_PASSWORD unset
     export ELASTICSEARCH_URLS
     export ES_USER="${ES_USER:-elastic}"
     export ES_PASSWORD_FILE="${ES_PASSWORD_FILE:-${SHARE_PATH}/credential.txt}"
@@ -159,5 +183,3 @@ if [ -x "${NODE_BIN}" ]; then
 else
     echo "recovery-ui dist/ or node missing; no fallback."
 fi
-
-bash
