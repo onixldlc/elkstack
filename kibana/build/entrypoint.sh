@@ -145,7 +145,7 @@ su kibana -s /bin/bash -c "/usr/share/kibana/bin/kibana \
 RECOVERY_UI_DIR="${KIBANA_BUILD}/recovery-ui"
 RECOVERY_PORT="${KIBANA_PORT:-5601}"
 NODE_BIN="$(command -v node || echo /usr/share/kibana/node/bin/node)"
-if [ -d "${RECOVERY_UI_DIR}/dist" ] && [ -x "${NODE_BIN}" ]; then
+if [ -x "${NODE_BIN}" ]; then
     echo "Kibana exited. Starting recovery-ui on port ${RECOVERY_PORT}..."
     cd "${RECOVERY_UI_DIR}"
     export PORT="${RECOVERY_PORT}"
