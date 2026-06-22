@@ -52,15 +52,16 @@ until [ -f "${MONITOR_CRED_FILE}" ]; do
 done
 
 MONITOR_PASSWORD=$(cat "${MONITOR_CRED_FILE}")
-ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS}" | jq -r '.[0]')
+LOGSTASH_DISK_LIMIT=85
 
 echo "Checking Elasticsearch disk usage..."
+ELASTIC_URL=$(echo "${ELASTICSEARCH_URLS}" | jq -r '.[0]')
 DISK_PCT=$(curl --insecure --silent \
     -u "logstash_monitor:${MONITOR_PASSWORD}" \
     "${ELASTIC_URL}/_cat/allocation?h=disk.percent" 2>/dev/null \
     | grep -E '^[0-9]+' | sort -rn | head -1 | tr -d ' ')
 
-if [ -z "$DISK_PCT" ]; then
+if [ -z "${DISK_PCT}" ]; then
     if [ "${IGNORE_DISK_CHECK:-false}" = "true" ]; then
         echo "WARNING: Could not retrieve disk usage. IGNORE_DISK_CHECK=true — proceeding anyway."
     else
@@ -68,17 +69,17 @@ if [ -z "$DISK_PCT" ]; then
         echo "       Set IGNORE_DISK_CHECK=true to bypass this check (not recommended)."
         exit 1
     fi
-elif [ "$DISK_PCT" -ge 90 ]; then
+elif [ "${DISK_PCT}" -ge "${LOGSTASH_DISK_LIMIT}" ]; then
     if [ "${IGNORE_DISK_CHECK:-false}" = "true" ]; then
-        echo "WARNING: Elasticsearch disk at ${DISK_PCT}%. IGNORE_DISK_CHECK=true — proceeding anyway."
+        echo "WARNING: ES disk at ${DISK_PCT}% >= ${LOGSTASH_DISK_LIMIT}% limit. IGNORE_DISK_CHECK=true — proceeding anyway."
         echo "         This risks Elasticsearch data corruption. Resolve disk pressure ASAP."
     else
-        echo "ERROR: Elasticsearch disk at ${DISK_PCT}%. Refusing to start — protect data integrity."
+        echo "ERROR: ES disk at ${DISK_PCT}% exceeds ${LOGSTASH_DISK_LIMIT}% limit. Refusing to start."
         echo "       Free up disk space or set IGNORE_DISK_CHECK=true to bypass (not recommended)."
         exit 1
     fi
 else
-    echo "Elasticsearch disk usage: ${DISK_PCT}%. Proceeding."
+    echo "ES disk usage: ${DISK_PCT}% (limit: ${LOGSTASH_DISK_LIMIT}%). Proceeding."
 fi
 
 echo "Starting Logstash..."
